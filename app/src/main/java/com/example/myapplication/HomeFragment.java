@@ -15,6 +15,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -61,6 +62,7 @@ public class HomeFragment extends Fragment {
     private FragmentManager fragmentManager;
     private static Boolean isFirst = true;
     private static final int REQUEST_ENABLE_BT = 1;
+    private static final int MULTI_PERMISSIONS_REQUEST_CODE = 101;
     private BluetoothAdapter bluetoothAdapter = null;
     private BluetoothSocket bluetoothSocket = null;
     private List<BluetoothDevice> btDeviceList = new ArrayList<>();
@@ -95,12 +97,36 @@ public class HomeFragment extends Fragment {
             if (bluetoothSocket.isConnected()) {
                 // 建立数据通道
                 outputStream = bluetoothSocket.getOutputStream();
-                if (connectDialog != null && connectDialog.isShowing()) {
-                    connectDialog.dismiss();
-                }
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (connectDialog != null && connectDialog.isShowing()) {
+                            connectDialog.dismiss();
+                        }
+                        Toast.makeText(getActivity(), "已连接到默认设备", Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
+
         } catch (IOException e) {
             e.printStackTrace();
+            getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (connectDialog != null && connectDialog.isShowing()) {
+                        connectDialog.dismiss();
+                    }
+                    Toast.makeText(getActivity(), "无法连接到默认设备：设备未打开或不在范围内", Toast.LENGTH_LONG).show();
+                }
+            });
+            if (bluetoothSocket != null) {
+                try {
+                    bluetoothSocket.close();
+                } catch (IOException ex) {
+                    // 记录关闭时的异常
+                    Log.e("BluetoothConnection", "Error closing socket", ex);
+                }
+            }
         }
     }
 
@@ -221,8 +247,8 @@ public class HomeFragment extends Fragment {
             mParam1 = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
         }
-        checkPermissions();
         initBluetooth();
+        checkPermissions();
 //        autoConnect(defaultDeviceAddr);
     }
 
@@ -260,38 +286,64 @@ public class HomeFragment extends Fragment {
         return rootView;
     }
 
+    private void showConnectDialog(String deviceAddress) {
+        // 弹出窗口的代码
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Info");
+        builder.setMessage("正在连接默认设备：\n" + "JDY-31-SPP\n" + defaultDeviceAddr + "\n");
+        builder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                dialog.dismiss();
+                // 如果需要，取消蓝牙连接操作
+            }
+        });
+        connectDialog = builder.create();
+        connectDialog.setCancelable(false);
+        connectDialog.show();
+    }
+
+    // 在异步任务中执行蓝牙连接
+    private void createConnectionAsync(final BluetoothDevice device) {
+        // 使用 AsyncTask 或其他并发工具
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                // 执行蓝牙连接操作
+                if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
+                    // 设备已配对，可以直接连接
+                    // 调用连接方法
+                    createConnection(device);
+                } else {
+                    // 设备未配对，需要先配对
+                    boolean bondResult = device.createBond();
+                    if (bondResult) {
+                        // 等待配对完成
+                        while (device.getBondState() != BluetoothDevice.BOND_BONDED) {
+                            // 适当等待，避免忙等
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        // 配对成功后连接
+                        createConnection(device);
+                    }
+                }
+            }
+        }).start();
+    }
+
     /*
         自动连接指定设备
      */
     private void autoConnect(String addr) {
-        // 创建Device对象
+        // 显示连接窗口
+        showConnectDialog(addr);
+        // 获取设备对象
         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(addr);
-        // 检查设备是否已配对
-        if (device != null) {
-            // 弹出窗口
-            AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-            builder.setTitle("Info");
-            builder.setMessage("正在连接默认设备：\n" + defaultDeviceAddr + "\n");
-            builder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int id) {
-                    dialog.dismiss();
-                }
-            });
-            connectDialog = builder.create();
-            connectDialog.setCancelable(false);
-            connectDialog.show();
-
-            if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-                // 设备已配对，可以直接连接
-                createConnection(device);
-            } else {
-                // 设备未配对，需要先配对
-                device.createBond();
-                while (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-                    createConnection(device);
-                }
-            }
-        }
+        // 执行异步连接操作
+        createConnectionAsync(device);
     }
 
     private void initBluetooth() {
@@ -317,41 +369,47 @@ public class HomeFragment extends Fragment {
     }
 
     private void checkPermissions() {
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH},
-                    REQUEST_ENABLE_BT);
+        // 检查权限是否被允许
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED
+        || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED
+        || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED
+        || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // 申请以上权限
+            requestPermissions(new String[]{
+                            Manifest.permission.BLUETOOTH,
+                            Manifest.permission.BLUETOOTH_ADMIN,
+                            Manifest.permission.BLUETOOTH_CONNECT,
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        }, MULTI_PERMISSIONS_REQUEST_CODE);
+        } else {
+            autoConnect(defaultDeviceAddr);
         }
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_ADMIN)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.BLUETOOTH_ADMIN, Manifest.permission.BLUETOOTH_ADMIN},
-                    REQUEST_ENABLE_BT);
-        }
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_CONNECT},
-                    REQUEST_ENABLE_BT);
-        }
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_SCAN},
-                    REQUEST_ENABLE_BT);
-        }
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
-                    REQUEST_ENABLE_BT);
-        }
-        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(getActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION},
-                    REQUEST_ENABLE_BT);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        Log.i("info", "here");
+        if (requestCode == MULTI_PERMISSIONS_REQUEST_CODE) {
+            // 检查所有权限是否被授予
+            boolean allPermissionsGranted = true;
+            for (int i = 0; i < grantResults.length; i++) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                    allPermissionsGranted = false;
+                    break;
+                }
+            }
+            if (allPermissionsGranted) {
+                // 所有权限都被授予，可以执行相关操作
+                Log.i("info", "allow");
+                autoConnect(defaultDeviceAddr);
+            } else {
+                // 至少一个权限被拒绝，可以提示用户或禁用某些功能
+                Log.i("info", "no allow");
+            }
         }
     }
 
@@ -416,7 +474,7 @@ public class HomeFragment extends Fragment {
                         // 弹出窗口
                         AlertDialog.Builder builder1 = new AlertDialog.Builder(getContext());
                         builder1.setTitle("版本信息");
-                        builder1.setMessage("V3.2.0");
+                        builder1.setMessage("V3.3.0");
                         builder1.setNegativeButton("取消", new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
                                 dialog.dismiss();
