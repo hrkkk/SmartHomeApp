@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <declare-styleable name="CustomSeekBar">
+        <attr name="android:progressDrawable" format="color"/>
+    </declare-styleable>
+</resources>
+<!--<resources>-->
+<!--    <declare-styleable name="CustomSeekBar">-->
+<!--        &lt;!&ndash; 定义一个新的属性，命名为 progressTint 等 &ndash;&gt;-->
+<!--        <attr name="progressTint" format="color|reference" />-->
+<!--    </declare-styleable>-->
+<!--</resources>-->

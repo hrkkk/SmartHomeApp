@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="mode_item">
+        <item>根据日出日落</item>
+        <item>根据主人意愿</item>
+    </string-array>
+</resources>

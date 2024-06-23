@@ -1,0 +1,58 @@
+<!--<layer-list xmlns:android="http://schemas.android.com/apk/res/android">-->
+<!--    &lt;!&ndash; 背景部分 &ndash;&gt;-->
+<!--    <item>-->
+<!--        <shape>-->
+<!--            <corners android:radius="30dp"/>-->
+<!--            <size android:height="40dp"/>-->
+<!--            <solid android:color="#D5D5D5"/> &lt;!&ndash; 灰色背景 &ndash;&gt;-->
+<!--        </shape>-->
+<!--    </item>-->
+<!--    &lt;!&ndash; 进度部分，使用@drawable/seekbar_progress定义的黄色条 &ndash;&gt;-->
+<!--    <item>-->
+<!--        <clip-->
+<!--            android:clipOrientation="horizontal"-->
+<!--            android:gravity="left"/>-->
+<!--        <shape>-->
+<!--            <corners android:radius="30dp"/>-->
+<!--            <size android:height="40dp"/>-->
+<!--            <solid android:color="#FFD700"/> &lt;!&ndash; 黄色进度条 &ndash;&gt;-->
+<!--        </shape>-->
+<!--    </item>-->
+<!--</layer-list>-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- 灰色背景 -->
+<item android:id="@android:id/background">
+    <shape>
+        <corners android:radius="30dp" />
+        <size android:height="40dp"/>
+        <solid android:color="#EDEFED" /> <!-- 灰色 -->
+    </shape>
+</item>
+
+<!-- 黄色进度 -->
+<item android:id="@android:id/progress">
+    <clip>
+        <shape>
+            <corners android:radius="30dp" />
+            <size android:height="40dp"/>
+            <solid android:color="#E0C764" /> <!-- 黄色 -->
+        </shape>
+    </clip>
+</item>
+
+
+</layer-list>
+
+
+    <!--<?xml version="1.0" encoding="utf-8"?>-->
+    <!--<shape xmlns:android="http://schemas.android.com/apk/res/android">-->
+    <!--    <corners android:radius="30dp"/>-->
+    <!--    <size android:height="40dp"/>-->
+    <!--    <gradient-->
+    <!--        android:type="linear"-->
+    <!--        android:startColor="#D5D5D5"-->
+    <!--        android:endColor="#D5D5D5"-->
+    <!--        android:angle="0"-->
+    <!--        android:centerX="0.5"-->
+    <!--        android:centerY="0.5" />-->
+    <!--</shape>-->
